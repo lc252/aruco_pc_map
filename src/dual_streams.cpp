@@ -59,6 +59,7 @@ public:
         cv_im.encoding = "bgr8"; // breaks
         cv_im.image = mat;
         sensor_msgs::ImagePtr ros_image = cv_im.toImageMsg();
+        ros_image->header.stamp = ros::Time::now();
         return ros_image;
     }
 
@@ -75,7 +76,7 @@ public:
         // convert to ROS pointcloud
         sensor_msgs::PointCloud2 output_cloud;
         pcl::toROSMsg(*cloud, output_cloud);
-        output_cloud.header.frame_id = "depth_frame";
+        output_cloud.header.frame_id = "depth_optical";
 
         return output_cloud;
     }
@@ -115,9 +116,9 @@ private:
         for (int i = 0; i < points.size(); i++)
         {   
             // map xyz, alter to fit with the world xyz frame
-            pcl_cloud->points[i].x = Vertex[i].z;
-            pcl_cloud->points[i].y = -Vertex[i].x;
-            pcl_cloud->points[i].z = -Vertex[i].y;
+            pcl_cloud->points[i].x = Vertex[i].x;
+            pcl_cloud->points[i].y = Vertex[i].y;
+            pcl_cloud->points[i].z = Vertex[i].z;
 
         }
         
@@ -147,8 +148,8 @@ private:
         Eigen::Quaternionf q(m);
 
         geometry_msgs::TransformStamped tf;
-        tf.header.frame_id = "depth_frame";
-        tf.child_frame_id = "color_frame";
+        tf.header.frame_id = "depth_optical";
+        tf.child_frame_id = "color_optical";
         tf.transform.rotation.x = q.x();
         tf.transform.rotation.y = q.y();
         tf.transform.rotation.z = q.z();
@@ -156,8 +157,17 @@ private:
         tf.transform.translation.x = ext.translation[0];
         tf.transform.translation.y = ext.translation[1];
         tf.transform.translation.z = ext.translation[2];
+
+        geometry_msgs::TransformStamped link_tf;
+        link_tf.header.frame_id = "camera_link";
+        link_tf.child_frame_id = "depth_optical";
+        link_tf.transform.rotation.x = -0.5;
+        link_tf.transform.rotation.y = 0.5;
+        link_tf.transform.rotation.z = -0.5;
+        link_tf.transform.rotation.w = 0.5;
     
         br.sendTransform(tf);
+        br.sendTransform(link_tf);
     }
 
 };
@@ -174,41 +184,20 @@ int main(int argc, char **argv)
     image_transport::ImageTransport it(nh);
     image_transport::Publisher im_pub = it.advertise("camera/image", 1);
     // camera info publisher
-    ros::Publisher info_pub = nh.advertise<sensor_msgs::CameraInfo>("camera/info", 1);
+    ros::Publisher info_pub = nh.advertise<sensor_msgs::CameraInfo>("camera/camera_info", 1);
     camera_info_manager::CameraInfoManager info_manager(nh, "realsense");
     // camera info should not change, only get once
     sensor_msgs::CameraInfo info;
-    /*
-    header: 
-    seq: 354
-    stamp: 
-        secs: 1674540313
-        nsecs: 185359955
-    frame_id: "camera_color_optical_frame"
-    height: 720
-    width: 1280
-    distortion_model: "plumb_bob"
-    D: [0.0, 0.0, 0.0, 0.0, 0.0]
-    K: [923.98388671875, 0.0, 647.1097412109375, 0.0, 924.1301879882812, 369.11614990234375, 0.0, 0.0, 1.0]
-    R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
-    P: [923.98388671875, 0.0, 647.1097412109375, 0.0, 0.0, 924.1301879882812, 369.11614990234375, 0.0, 0.0, 0.0, 1.0, 0.0]
-    binning_x: 0
-    binning_y: 0
-    roi: 
-    x_offset: 0
-    y_offset: 0
-    height: 0
-    width: 0
-    do_rectify: False
-    */
-    info.header.frame_id = "color_frame";
+
+    info.header.frame_id = "color_optical";
     info.height = 480;
     info.width = 640;
     info.distortion_model = "plumb_bob";
+    // these values are specific to a resolution of 640*480
     info.D = {0.0, 0.0, 0.0, 0.0, 0.0};
-    info.K = {923.98388671875, 0.0, 647.1097412109375, 0.0, 924.1301879882812, 369.11614990234375, 0.0, 0.0, 1.0};
+    info.K = {615.9893188476562, 0.0, 324.7398376464844, 0.0, 616.0867919921875, 246.0774383544922, 0.0, 0.0, 1.0};
     info.R = {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
-    info.P = {923.98388671875, 0.0, 647.1097412109375, 0.0, 0.0, 924.1301879882812, 369.11614990234375, 0.0, 0.0, 0.0, 1.0, 0.0};
+    info.P = {615.9893188476562, 0.0, 324.7398376464844, 0.0, 0.0, 616.0867919921875, 246.0774383544922, 0.0, 0.0, 0.0, 1.0, 0.0};
 
 
     // init camera

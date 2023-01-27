@@ -1,0 +1,21 @@
+<launch>
+
+    <!-- run camera -->
+    <node pkg="aruco_pc_map" name="camera_streamer" type="dual_streams"></node>
+
+    <!-- launch files for localising the camera with aruco markers -->
+    <include file="$(find aruco_pc_map)/include/launch/aruco_detect.launch"/>
+    <include file="$(find aruco_pc_map)/include/launch/static_fiducial_tfs.launch"/>
+    <node pkg="aruco_pc_map" name="aruco_inverse_transformer" type="inverse_aruco_transforms"></node>
+
+    <!-- create point maps -->
+    <node pkg="aruco_pc_map" name="cloud_transformer" type="cloud_transformer"></node>
+    <node pkg="aruco_pc_map" name="cloud_mapper" type="pointcloud_mapping"></node>
+
+    <!-- visualise results -->
+    <node pkg="rviz" name="rviz" type="rviz" args="-d $(find aruco_pc_map)/rviz/aruco_pc_map.rviz" required="true"></node>
+
+    <!-- create octomap -->
+    <include file="$(find aruco_pc_map)/include/launch/octomap_mapping.launch"/>
+    
+</launch>

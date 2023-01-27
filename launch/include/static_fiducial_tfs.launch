@@ -1,0 +1,26 @@
+<!-- launch the necessary static tfs between the fiducials and the world frame. bring a ruler tomorrow to measure -->
+<launch>
+
+    <!-- map is top left of paper. the marker coordinates are given from the svg file. -->
+
+    <!-- top left -->
+    <node pkg="tf" name="map_to_aruco_26" type="static_transform_publisher"
+        args="0.044 -0.044 0 0 0 0 map aruco_26 1">
+    </node>
+
+    <!-- top right -->
+    <node pkg="tf" name="map_to_aruco_111" type="static_transform_publisher"
+        args="0.166 -0.044 0 0 0 0 map aruco_111 1">
+    </node>
+
+    <!-- bottom left -->
+    <node pkg="tf" name="map_to_aruco_226" type="static_transform_publisher"
+        args="0.044 -0.244 0 0 0 0 map aruco_226 1">
+    </node>
+
+    <!-- bottom right -->
+    <node pkg="tf" name="map_to_aruco_733" type="static_transform_publisher"
+        args="0.166 -0.244 0 0 0 0 map aruco_733 1">
+    </node>
+
+</launch>
