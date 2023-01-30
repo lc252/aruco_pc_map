@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(aruco-pc-map)
+project(aruco_pc_map)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -10,8 +10,9 @@ project(aruco-pc-map)
 find_package(catkin REQUIRED COMPONENTS
   camera_info_manager
   cv_bridge
-  pcl
+  pcl_ros
   realsense2_camera
+  realsense2
   roscpp
   rospy
   tf
@@ -110,7 +111,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES aruco-pc-map
+#  LIBRARIES aruco_pc_map
 #  CATKIN_DEPENDS camera_info_manager cv_bridge pcl realsense2_camera roscpp rospy tf tf2 tf2_eigen
 #  DEPENDS system_lib
 )
@@ -128,7 +129,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/aruco-pc-map.cpp
+#   src/${PROJECT_NAME}/aruco_pc_map.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -139,7 +140,11 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/aruco-pc-map_node.cpp)
+add_executable(cloud_transformer src/cloud_transformer.cpp)
+add_executable(dual_streams src/dual_streams.cpp)
+add_executable(inverse_aruco_transforms src/inverse_aruco_transforms.cpp)
+add_executable(pointcloud_mapping src/pointcloud_mapping.cpp)
+add_executable(map_filtering src/map_filtering.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -152,9 +157,11 @@ include_directories(
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(cloud_transformer ${catkin_LIBRARIES})
+target_link_libraries(dual_streams ${catkin_LIBRARIES}  ${DEPENDENCIES} ${realsense2_LIBRARY})
+target_link_libraries(inverse_aruco_transforms ${catkin_LIBRARIES}) 
+target_link_libraries(pointcloud_mapping ${catkin_LIBRARIES})
+target_link_libraries(map_filtering ${catkin_LIBRARIES})
 
 #############
 ## Install ##
@@ -203,7 +210,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_aruco-pc-map.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_aruco_pc_map.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
