@@ -27,7 +27,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: Image
+    SyncSource: PC2 Stream
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -93,7 +93,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -108,7 +108,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -154,30 +154,12 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        aruco_111:
-          Value: false
-        aruco_226:
-          Value: false
-        aruco_26:
-          Value: false
-        aruco_733:
-          Value: false
         camera_link:
           Value: true
         color_optical:
           Value: false
         depth_optical:
           Value: false
-        fiducial_111:
-          Value: false
-        fiducial_226:
-          Value: false
-        fiducial_26:
-          Value: false
-        fiducial_733:
-          Value: false
-        map:
-          Value: true
       Marker Alpha: 1
       Marker Scale: 0.5
       Name: TF
@@ -185,25 +167,10 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        map:
-          aruco_111:
-            {}
-          aruco_226:
-            camera_link:
-              depth_optical:
-                color_optical:
-                  fiducial_111:
-                    {}
-                  fiducial_226:
-                    {}
-                  fiducial_26:
-                    {}
-                  fiducial_733:
-                    {}
-          aruco_26:
-            {}
-          aruco_733:
-            {}
+        camera_link:
+          depth_optical:
+            color_optical:
+              {}
       Update Interval: 0
       Value: true
     - Class: rviz/MarkerArray
@@ -211,14 +178,23 @@ Visualization Manager:
       Marker Topic: /occupied_cells_vis_array
       Name: MarkerArray
       Namespaces:
-        map: true
+        {}
       Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Class: rviz/Axes
+      Enabled: true
+      Length: 0.10000000149011612
+      Name: Axes
+      Radius: 0.009999999776482582
+      Reference Frame: <Fixed Frame>
+      Show Trail: false
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: map
+    Fixed Frame: camera_link
     Frame Rate: 30
   Name: root
   Tools:
@@ -242,7 +218,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.2259695529937744
+      Distance: 1.2067877054214478
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -258,9 +234,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8347964286804199
+      Pitch: 0.37979650497436523
       Target Frame: <Fixed Frame>
-      Yaw: 0.4553995430469513
+      Yaw: 3.363583564758301
     Saved:
       - Class: rviz/Orbit
         Distance: 1.9956445693969727
