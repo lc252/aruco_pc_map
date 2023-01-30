@@ -10,7 +10,8 @@
 
     <!-- create point maps -->
     <node pkg="aruco_pc_map" name="cloud_transformer" type="cloud_transformer"></node>
-    <node pkg="aruco_pc_map" name="cloud_mapper" type="pointcloud_mapping"></node>
+    <!-- <node pkg="aruco_pc_map" name="cloud_mapper" type="pointcloud_mapping"></node> -->
+    <!-- <node pkg="aruco_pc_map" name="mapper" type="map_filtering"></node> -->
 
     <!-- visualise results -->
     <node pkg="rviz" name="rviz" type="rviz" args="-d $(find aruco_pc_map)/rviz/aruco_pc_map.rviz" required="true"></node>

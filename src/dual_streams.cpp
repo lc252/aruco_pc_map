@@ -25,7 +25,7 @@ public:
     RealSense_Camera()
     {
         // constructor configures streams, starts the pipeline and
-        // publishes the static tr    ansforms
+        // publishes the static transforms
 
         // setup streams
         cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8);

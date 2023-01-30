@@ -116,6 +116,8 @@ void add_cloud_to_map(sensor_msgs::PointCloud2 cloud_in)
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud;
 
+    std::cout << "message recieved and empty cloud made" << std::endl;
+
     /* Filtering Strategy
     Incoming cloud:
         - Passthrough the ROI
@@ -135,8 +137,10 @@ void add_cloud_to_map(sensor_msgs::PointCloud2 cloud_in)
     // get the base plane, remove from new_cloud
     pcl::PointCloud<pcl::PointXYZ>::Ptr plane;
     segment_plane(new_cloud, plane);
+    std::cout << "plane" << std::endl;
     // filter the base plane
     voxel_filter(plane, 0.02);
+    std::cout << "voxel plane" << std::endl;
 
     // cluster indices of new_cloud
     std::vector<pcl::PointIndices> cluster_indices;
