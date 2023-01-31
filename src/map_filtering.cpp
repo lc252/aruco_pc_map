@@ -8,13 +8,16 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/conversions.h>
+#include <eigen3/Eigen/Eigen>
+#include <pcl/common/common.h>
 
 
 ros::Publisher pub;
 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_map(new pcl::PointCloud<pcl::PointXYZ>);
 
 
-void cube_passthrough_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, float bounds)
+void cubic_roi_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, float bounds)
 {
     // filter out points outside of a cubic ROI
 
@@ -37,6 +40,29 @@ void cube_passthrough_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, float b
     pass.filter(*input);
 }
 
+void custom_roi_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, pcl::PointCloud<pcl::PointXYZ>::Ptr &output, pcl::PointXYZ &min_pt, pcl::PointXYZ &max_pt)
+{
+    // Return the part of the cloud in the ROI
+
+    // Create and execute filter
+    pcl::PassThrough<pcl::PointXYZ> pass;
+    // x
+    pass.setInputCloud(input);
+    pass.setFilterFieldName("x");
+    pass.setFilterLimits(min_pt.x, max_pt.x);
+    pass.filter(*output);
+    // y
+    pass.setInputCloud(input);
+    pass.setFilterFieldName("y");
+    pass.setFilterLimits(min_pt.y, max_pt.y);
+    pass.filter(*output);
+    // z
+    pass.setInputCloud(input);
+    pass.setFilterFieldName("z");
+    pass.setFilterLimits(min_pt.z, max_pt.z);
+    pass.filter(*output);
+}
+
 void voxel_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, float leaf_size)
 {
     // 
@@ -49,7 +75,7 @@ void voxel_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, float leaf_size)
 
 void segment_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, pcl::PointCloud<pcl::PointXYZ>::Ptr &output)
 {
-    // return the largest planar segment of the cloud (ground plane)
+    // split the input into a planar segment (output) and a clusters segment (input)
     
     // Create the segmentation object for the planar model and set all the parameters
     pcl::SACSegmentation<pcl::PointXYZ> seg;
@@ -61,7 +87,7 @@ void segment_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, pcl::PointCloud<p
     seg.setModelType(pcl::SACMODEL_PLANE);
     seg.setMethodType(pcl::SAC_RANSAC);
     seg.setMaxIterations(100);
-    seg.setDistanceThreshold(0.02);
+    seg.setDistanceThreshold(0.0025); // 1mm tolerance on plane
 
     seg.setInputCloud(input);
     seg.segment(*inliers, *coefficients);
@@ -108,76 +134,86 @@ std::vector<pcl::PointIndices> get_clusters(pcl::PointCloud<pcl::PointXYZ>::Ptr 
 
 void add_cloud_to_map(sensor_msgs::PointCloud2 cloud_in)
 {
-    // add the new cloud to the map after some filtering
-
-    // get pcl from ROS
-    pcl::PointCloud<pcl::PointXYZ>::Ptr new_cloud;
-    pcl::fromROSMsg(cloud_in, *new_cloud);
-
-    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud;
-
-    std::cout << "message recieved and empty cloud made" << std::endl;
-
+    // add the new cloud to the map and filter
     /* Filtering Strategy
     Incoming cloud:
         - Passthrough the ROI
-        - Segment the largest plane
-            - Voxel the planar segment heavily
-        - Extract clusters from non-planar component
-            - Reject small clusters
-            - Voxel lightly
     
     Add to map.
 
     Map:
-        - Not yet determined.
+        - Segment the largest plane
+            - Voxel the planar segment heavily
+        - Copy the cluster segment
+            - Voxel heavily
+            - For each cluster in copied clusters
+                - Find the x, y, z bounds
+                - Reject volumes smaller than ? 
+        - Extract clusters from original cluster segment using x, y, z bounds + tolerance
+            - Voxel lightly, maintain resolution, remove duplicates
     */
 
 
-    // get the base plane, remove from new_cloud
-    pcl::PointCloud<pcl::PointXYZ>::Ptr plane;
-    segment_plane(new_cloud, plane);
-    std::cout << "plane" << std::endl;
-    // filter the base plane
-    voxel_filter(plane, 0.02);
-    std::cout << "voxel plane" << std::endl;
+    // get pcl from ROS
+    pcl::PointCloud<pcl::PointXYZ>::Ptr incoming_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::fromROSMsg(cloud_in, *incoming_cloud);
+    // container for filtered clouds
+    pcl::PointCloud<pcl::PointXYZ>::Ptr map_copy(new pcl::PointCloud<pcl::PointXYZ>);
+    std::cout << "message converted" << std::endl;
 
-    // cluster indices of new_cloud
+    // ROI filter the incoming cloud
+    cubic_roi_filter(incoming_cloud, 0.5);
+    std::cout << "roi filter" << std::endl;
+
+    // literally add to the map lol
+    *cloud_map += *incoming_cloud;
+    std::cout << "added to map" << std::endl;
+
+    // segment the plane from the clusters
+    pcl::PointCloud<pcl::PointXYZ>::Ptr plane(new pcl::PointCloud<pcl::PointXYZ>);
+    segment_plane(cloud_map, plane);
+    // filter the plane
+    voxel_filter(plane, 0.02);
+    std::cout << "segmented and filtered plane" << std::endl;
+
+    // populate the copy with data from the map
+    *map_copy += *cloud_map;
+    std::cout << "populated copy" << std::endl;
+
+    // downsample copy
+    voxel_filter(map_copy, 0.01);
+    // find clusters in the copy
+    std::cout << "getting clusters in downsampled copy" << std::endl;
     std::vector<pcl::PointIndices> cluster_indices;
-    cluster_indices = get_clusters(new_cloud);
+    cluster_indices = get_clusters(map_copy);
+    std::cout << "got clusters" << std::endl;
     // iterate through the cluster indicies
     for(std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
     {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+        const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
         // iterate through points of the cluster index
         for(std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
         {
             // add them to the current cluster
-            cloud_cluster->push_back((*new_cloud)[*pit]);
+            cloud_cluster->push_back((*map_copy)[*pit]);
         }
         // format cloud
         cloud_cluster->width = cloud_cluster->size();
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
 
-        // voxel cloud cluster finely
-        voxel_filter(cloud_cluster, 0.005);
+        // find the bounds of the cluster
+        pcl::PointXYZ min_pt, max_pt;
+        pcl::getMinMax3D(*cloud_cluster, min_pt, max_pt);
 
-        // add cluster back to cloud
-        *filtered_cloud += *cloud_cluster;
+        std::cout << "new cluster x: " << min_pt.x << ", " << max_pt.x << std::endl; 
     }
 
-    // add filtered plane back to cloud
-    *filtered_cloud += *plane;
+    std::cout << "finished iterating clusters" << std::endl;
 
+    // debug return
+    return;
 
-    // literally add lol
-    *cloud_map += *filtered_cloud;
-    std::cout << "added" << std::endl;
-
-    // filter map
-    // voxel_filter(cloud_map, 0.005);
-    // cube_passthrough_filter(cloud_map, 0.5);
 
     sensor_msgs::PointCloud2 ros_cloud_map;
     pcl::toROSMsg(*cloud_map, ros_cloud_map);
