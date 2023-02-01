@@ -164,18 +164,14 @@ void add_cloud_to_map(sensor_msgs::PointCloud2 cloud_in)
     pcl::fromROSMsg(cloud_in, *incoming_cloud);
     // container for filtered clouds
     pcl::PointCloud<pcl::PointXYZ>::Ptr map_copy(new pcl::PointCloud<pcl::PointXYZ>);
-    std::cout << "message converted" << std::endl;
 
     // ROI filter the incoming cloud
     cubic_roi_filter(incoming_cloud, 0.5);
-    std::cout << "roi filter" << std::endl;
 
     // literally add to the map lol
     *cloud_map += *incoming_cloud;
-    std::cout << "added to map" << std::endl;
     // populate the copy with data from the map
     *map_copy += *cloud_map;
-    std::cout << "populated copy" << std::endl;
     // downsample copy
     voxel_filter(map_copy, 0.01);
 
@@ -184,13 +180,10 @@ void add_cloud_to_map(sensor_msgs::PointCloud2 cloud_in)
     segment_plane(map_copy, plane);
 
     // find clusters in the copy
-    std::cout << "getting clusters in downsampled copy" << std::endl;
     std::vector<pcl::PointIndices> cluster_indices;
     cluster_indices = get_clusters(map_copy);
-    std::cout << "got clusters" << std::endl;
     // iterate through the cluster indicies
-
-    pcl::PointCloud<pcl::PointXYZ>::Ptr temp(new pcl::PointCloud<pcl::PointXYZ>); // debugging
+    pcl::PointCloud<pcl::PointXYZ>::Ptr temp(new pcl::PointCloud<pcl::PointXYZ>);
     for(std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
@@ -213,15 +206,13 @@ void add_cloud_to_map(sensor_msgs::PointCloud2 cloud_in)
         Eigen::Vector4f tolerance{0.01, 0.01, 0.01, 0.01};
         min_pt -= tolerance;
         max_pt += tolerance;
-        // extract the full resolution cluster
+        // extract the full resolution cluster using the bounds +- tolerance
         custom_roi_filter(cloud_map, hd_cluster, min_pt, max_pt);
         // downsample very finely to remove duplicate points
         voxel_filter(hd_cluster, 0.001);
         // add the hd_cluster to temp
         *temp += *hd_cluster;
     }
-
-    std::cout << "finished iterating clusters" << std::endl;
 
     // add the plane back
     *temp += *plane;
