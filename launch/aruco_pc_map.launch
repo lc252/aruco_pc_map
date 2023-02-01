@@ -19,9 +19,4 @@
     <!-- create octomap -->
     <!-- <include file="$(find aruco_pc_map)/launch/include/octomap_mapping.launch"/> -->
 
-    <!-- debugging -->
-    <node pkg="tf" name="debug_static" type="static_transform_publisher"
-        args="0 0 0 0 0 0 map camera_link 1">
-    </node>
-
 </launch>
