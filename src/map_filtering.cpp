@@ -40,7 +40,7 @@ void cubic_roi_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, float bounds)
     pass.filter(*input);
 }
 
-void custom_roi_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, pcl::PointCloud<pcl::PointXYZ>::Ptr &output, pcl::PointXYZ &min_pt, pcl::PointXYZ &max_pt)
+void custom_roi_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, pcl::PointCloud<pcl::PointXYZ>::Ptr &output, Eigen::Vector4f &min_pt, Eigen::Vector4f &max_pt)
 {
     // Return the part of the cloud in the ROI
 
@@ -49,17 +49,17 @@ void custom_roi_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, pcl::PointClo
     // x
     pass.setInputCloud(input);
     pass.setFilterFieldName("x");
-    pass.setFilterLimits(min_pt.x, max_pt.x);
+    pass.setFilterLimits(min_pt.x(), max_pt.x());
     pass.filter(*output);
     // y
-    pass.setInputCloud(input);
+    pass.setInputCloud(output);
     pass.setFilterFieldName("y");
-    pass.setFilterLimits(min_pt.y, max_pt.y);
+    pass.setFilterLimits(min_pt.y(), max_pt.y());
     pass.filter(*output);
     // z
-    pass.setInputCloud(input);
+    pass.setInputCloud(output);
     pass.setFilterFieldName("z");
-    pass.setFilterLimits(min_pt.z, max_pt.z);
+    pass.setFilterLimits(min_pt.z(), max_pt.z());
     pass.filter(*output);
 }
 
@@ -70,6 +70,12 @@ void voxel_filter(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, float leaf_size)
     pcl::VoxelGrid<pcl::PointXYZ> sor;
     sor.setInputCloud(input);
     sor.setLeafSize (leaf_size, leaf_size, leaf_size);  // cube length m
+    /* setMinPointsPerVoxel
+    by setting min points per voxel to 3, I 
+    guarantee that ghost points from previous 
+    scans where an object no longer exists will be lost 
+    */
+    // sor.setMinimumPointsNumberPerVoxel(3);
     sor.filter(*input);
 }
 
@@ -83,14 +89,15 @@ void segment_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, pcl::PointCloud<p
     pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane(new pcl::PointCloud<pcl::PointXYZ>()), cloud_f(new pcl::PointCloud<pcl::PointXYZ>);
 
-    seg.setOptimizeCoefficients(true);
+    seg.setOptimizeCoefficients(false);
     seg.setModelType(pcl::SACMODEL_PLANE);
     seg.setMethodType(pcl::SAC_RANSAC);
-    seg.setMaxIterations(100);
-    seg.setDistanceThreshold(0.0025); // 1mm tolerance on plane
+    seg.setMaxIterations(100);        // more iterations = more likely to find largest plane, with a downsampled cloud it is more likely
+    seg.setDistanceThreshold(0.0025); // tolerance on plane (mm)
 
     seg.setInputCloud(input);
-    seg.segment(*inliers, *coefficients);
+    // finds the largest planar segment
+    seg.segment(*inliers, *coefficients);   // returns the inliers of largest plane found
     if(inliers->indices.size() == 0)
     {
         PCL_WARN("Planar segment not found...");
@@ -113,15 +120,13 @@ void segment_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr &input, pcl::PointCloud<p
 
 std::vector<pcl::PointIndices> get_clusters(pcl::PointCloud<pcl::PointXYZ>::Ptr &input)
 {
-    // Euclidean cluster extraction. Return the indices of cluster points
-
     // Creating the KdTree object for the search method of the extraction
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
     tree->setInputCloud(input);
 
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    ec.setClusterTolerance(0.02); // units m
+    ec.setClusterTolerance(0.015); // units m
     ec.setMinClusterSize(100); // points
     ec.setMaxClusterSize(25000);
     ec.setSearchMethod(tree);
@@ -168,29 +173,28 @@ void add_cloud_to_map(sensor_msgs::PointCloud2 cloud_in)
     // literally add to the map lol
     *cloud_map += *incoming_cloud;
     std::cout << "added to map" << std::endl;
-
-    // segment the plane from the clusters
-    pcl::PointCloud<pcl::PointXYZ>::Ptr plane(new pcl::PointCloud<pcl::PointXYZ>);
-    segment_plane(cloud_map, plane);
-    // filter the plane
-    voxel_filter(plane, 0.02);
-    std::cout << "segmented and filtered plane" << std::endl;
-
     // populate the copy with data from the map
     *map_copy += *cloud_map;
     std::cout << "populated copy" << std::endl;
-
     // downsample copy
     voxel_filter(map_copy, 0.01);
+
+    // segment the plane from the clusters
+    pcl::PointCloud<pcl::PointXYZ>::Ptr plane(new pcl::PointCloud<pcl::PointXYZ>);
+    segment_plane(map_copy, plane);
+
     // find clusters in the copy
     std::cout << "getting clusters in downsampled copy" << std::endl;
     std::vector<pcl::PointIndices> cluster_indices;
     cluster_indices = get_clusters(map_copy);
     std::cout << "got clusters" << std::endl;
     // iterate through the cluster indicies
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr test(new pcl::PointCloud<pcl::PointXYZ>); // debugging
     for(std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
     {
-        const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr hd_cluster(new pcl::PointCloud<pcl::PointXYZ>);
         // iterate through points of the cluster index
         for(std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
         {
@@ -202,21 +206,22 @@ void add_cloud_to_map(sensor_msgs::PointCloud2 cloud_in)
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
 
-        // find the bounds of the cluster
-        pcl::PointXYZ min_pt, max_pt;
+        // spatial bounds of the cluster
+        Eigen::Vector4f min_pt, max_pt;
         pcl::getMinMax3D(*cloud_cluster, min_pt, max_pt);
-
-        std::cout << "new cluster x: " << min_pt.x << ", " << max_pt.x << std::endl; 
+        // add a tolerance equal to the voxel leaf size. This ensures any corners lost in downsampling are kept when extracting the full feature.
+        Eigen::Vector4f tolerance{0.01, 0.01, 0.01, 0.01};
+        min_pt -= tolerance;
+        max_pt += tolerance;
+        // extract the full resolution cluster
+        custom_roi_filter(cloud_map, hd_cluster, min_pt, max_pt);
+        *test += *hd_cluster;
     }
 
     std::cout << "finished iterating clusters" << std::endl;
 
-    // debug return
-    return;
-
-
     sensor_msgs::PointCloud2 ros_cloud_map;
-    pcl::toROSMsg(*cloud_map, ros_cloud_map);
+    pcl::toROSMsg(*test, ros_cloud_map);
     ros_cloud_map.header.frame_id = "map";
     pub.publish(ros_cloud_map);
 }
